@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Variables, AppContext } from "./types.js";
+import { ApiError } from "./lib/errors.js";
 import { requestId, logger } from "./lib/utils.js";
 import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 export const app = new Hono<{ Variables: Variables }>();
@@ -49,3 +50,48 @@ app.get("/profile", async (c) => {
     },
   });
 });
+
+app.onError((err, c) => {
+  if (err instanceof ApiError) {
+    return c.json(
+      {
+        success: false,
+        error: { code: err.code, message: err.message },
+        meta: { requestId: c.get("requestId") },
+      },
+      err.status,
+    );
+  }
+
+  console.error(
+    JSON.stringify({
+      requestId: c.get("requestId"),
+      path: c.req.path,
+      error: err.message,
+      stack: err.stack,
+    }),
+  );
+
+  return c.json(
+    {
+      success: false,
+      error: { code: "INTERNAL", message: "Something went wrong on our side" },
+      meta: { requestId: c.get("requestId") },
+    },
+    500,
+  );
+});
+
+app.notFound((c) =>
+  c.json(
+    {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No route for ${c.req.method} ${c.req.path}`,
+      },
+      meta: { requestId: c.get("requestId") },
+    },
+    404,
+  ),
+);

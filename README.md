@@ -5,6 +5,21 @@ a single profile api which returns the linkedin profile data
 Give it a LinkedIn profile URL, get back structured JSON. It reads from LinkedIn's own
 private API (Voyager), not by scraping HTML and not through any third party service.
 
+## Live
+
+**https://linkedin-api.aryanbhati.com**
+
+```bash
+curl "https://linkedin-api.aryanbhati.com/profile?url=https://www.linkedin.com/in/aryangajjar"
+curl "https://linkedin-api.aryanbhati.com/health"
+```
+
+> **Note on the live demo.** LinkedIn auth is session cookies from a logged-in
+> account, and those expire and have to be replaced by hand. If the endpoint returns
+> `503 UPSTREAM_SESSION_EXPIRED`, the session needs refreshing rather than the code being broken.
+> `GET /health` says which it is: `status` is the server, `linkedinSession` is the cookies.
+> Running it locally with your own fresh cookies always works — see [Setup](#setup).
+
 ## Features
 
 - Full profile data — name, headline, location, about, experience, education, skills,
@@ -164,7 +179,11 @@ Full write up, including the traps: **[APPROACH.md](APPROACH.md)**
 - Image URLs are signed and expire after ~90 days (`expiresAt` is in the response)
 - `decorationId` is pinned to `FullProfileWithEntities-96`. If LinkedIn retires it, requests
   start redirecting and a new one has to be found
-- Cookies expire and have to be replaced by hand — `/health` tells you when the service is active
+- **Cookies expire and have to be replaced by hand** — `/health` tells you when. This is the main
+  reason the hosted demo can go quiet; there is no refresh token to automate
+- LinkedIn revokes a session outright (`set-cookie: li_at=delete me`) if requests don't look like
+  its own web client — the `x-li-track` fingerprint header turned out to matter, and omitting it
+  got an account restricted during development. Every request now carries the full header set the service is active
 - Cache and rate limits are in memory, so they reset on restart
 - This uses a private API and is against LinkedIn's terms of service. Built as a technical
   exercise — use an account you don't mind losing

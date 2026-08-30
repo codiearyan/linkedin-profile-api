@@ -1,15 +1,27 @@
-import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
+import "dotenv/config";
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import { app } from "./app.js";
+// import { env } from "hono/adapter";
 
-const app = new Hono()
+// type Bindings = {
+//   PORT: string;
+// };
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+// const app = new Hono<{ Bindings: Bindings }>();
 
-serve({
-  fetch: app.fetch,
-  port: 3000
-}, (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-})
+const PORT: number | string = process.env.PORT || 3000;
+
+app.get("/", (c) => {
+  return c.text(`Linkedin Profile API`);
+});
+
+serve(
+  {
+    fetch: app.fetch,
+    port: Number(PORT),
+  },
+  (info) => {
+    console.log(`Server is running on http://localhost:${info.port}`);
+  },
+);

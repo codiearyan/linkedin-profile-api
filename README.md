@@ -1,8 +1,9 @@
-```
-npm install
-npm run dev
-```
+# Linkedin Profile API
 
-```
-open http://localhost:3000
-```
+a single profile api which returns the linkedin profile data
+
+## Tech
+
+- HonoJs
+- Axios
+- Typescript

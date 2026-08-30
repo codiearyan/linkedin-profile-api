@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { ApiError } from "./errors.js";
 import { request, LINKEDIN_BASE } from "./utils.js";
 
@@ -9,6 +11,9 @@ const USER_AGENT =
 
 // JSESSIONID needs to be sent back as the csrf-token header or every call is a 403.
 function headers(): Record<string, string> {
+  const file = process.env.LI_COOKIE_FILE;
+  if (file) return cookieFileHeaders(file);
+
   const liAt = process.env.LI_AT;
   const jsessionId = process.env.JSESSIONID;
 
@@ -22,6 +27,34 @@ function headers(): Record<string, string> {
 
   const csrf = jsessionId.replace(/"/g, "");
 
+  return buildHeaders(`li_at=${liAt}; JSESSIONID="${csrf}"`, csrf);
+}
+
+// a browser sends around two dozen cookies and several of them, lidc especially, are short
+// lived. hand copying two of them means the set is incomplete the moment it is pasted and stale
+// soon after, which is what linkedin reacts to. when LI_COOKIE_FILE is set we instead read the
+// jar that the session daemon rewrites every five minutes from a real logged in browser.
+function cookieFileHeaders(file: string): Record<string, string> {
+  let jar: Record<string, string>;
+  try {
+    jar = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    throw new ApiError("UPSTREAM_SESSION_EXPIRED", 503, `Cannot read session file ${file}`);
+  }
+
+  const csrf = String(jar.JSESSIONID ?? "").replace(/"/g, "");
+  if (!csrf || !jar.li_at) {
+    throw new ApiError("UPSTREAM_SESSION_EXPIRED", 503, "Session file has no li_at/JSESSIONID");
+  }
+
+  const cookie = Object.entries(jar)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("; ");
+
+  return buildHeaders(cookie, csrf);
+}
+
+function buildHeaders(cookie: string, csrf: string): Record<string, string> {
   return {
     "csrf-token": csrf,
     "x-restli-protocol-version": "2.0.0",
@@ -44,7 +77,7 @@ function headers(): Record<string, string> {
       displayHeight: 982,
     }),
     "user-agent": USER_AGENT,
-    cookie: `li_at=${liAt}; JSESSIONID="${csrf}"`,
+    cookie,
     referer: "https://www.linkedin.com/feed/",
     origin: "https://www.linkedin.com",
   };

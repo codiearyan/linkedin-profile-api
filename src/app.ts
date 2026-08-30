@@ -4,6 +4,7 @@ import { ApiError } from "./lib/errors.js";
 import { requestId, logger } from "./lib/utils.js";
 import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 import { normalizeProfile } from "./lib/normalize.js";
+import { cached, invalidate } from "./lib/cache.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);
@@ -14,7 +15,7 @@ app.get("/", (c) =>
   c.json({
     name: "LinkedIn Profile API",
     endpoints: {
-      "GET /api/profile": {
+      "GET /profile": {
         url: "required — a LinkedIn profile URL or bare vanity name",
         fields: "optional — comma-separated sections",
         refresh: "optional — 'true' bypasses the cache",
@@ -38,7 +39,12 @@ app.get("/health", async (c) => {
 
 app.get("/profile", async (c) => {
   const vanity = parseVanity(c.req.query("url") ?? "");
-  const profile = await fetchRawProfile(vanity);
+
+  if (c.req.query("refresh") === "true") invalidate(vanity);
+
+  const { value: profile, hit } = await cached(vanity, async () =>
+    normalizeProfile(await fetchRawProfile(vanity)),
+  );
 
   return c.json({
     success: true,
@@ -46,6 +52,7 @@ app.get("/profile", async (c) => {
     meta: {
       requestId: c.get("requestId"),
       vanity,
+      cached: hit,
       fetchedAt: new Date().toISOString(),
       durationMs: Date.now() - c.get("startedAt"),
     },

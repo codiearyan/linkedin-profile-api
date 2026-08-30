@@ -41,7 +41,11 @@ curl "https://linkedin-api.aryanbhati.com/health"
 pnpm install
 ```
 
-Create a `.env`:
+The API needs a logged-in LinkedIn session. There are two ways to give it one.
+
+### Quick — copy the cookies by hand
+
+Fine for running it locally.
 
 ```
 LI_AT=
@@ -49,14 +53,66 @@ JSESSIONID=
 PORT=3000
 ```
 
-Both are cookies from a logged-in LinkedIn session:
-
 1. Log in to LinkedIn
 2. DevTools → **Application** → Cookies → `https://www.linkedin.com`
 3. Copy `li_at` and `JSESSIONID`
 
-Copy both at the same time. `JSESSIONID` changes on every page reload, so if you grab one and
-then refresh, they won't match and every request will fail.
+Copy both at the same moment. `JSESSIONID` changes on every page reload, so grabbing one and then
+refreshing gives you a mismatched pair that fails every request.
+
+Expect these to stop working within hours. LinkedIn revokes sessions whose requests don't look
+like its own web client, and two hand-copied cookies out of the two dozen a browser sends is one
+of the things it notices.
+
+### Durable — the session keeper
+
+This is how the deployment runs. A real Chromium stays logged in on the server and rewrites the
+whole cookie jar every five minutes, so nothing is copied by hand and short-lived cookies like
+`lidc` stay current. See [APPROACH.md](APPROACH.md) for why.
+
+```
+LI_COOKIE_FILE=/home/ubuntu/li-session/cookies.json
+PORT=3000
+```
+
+`LI_COOKIE_FILE` takes priority over `LI_AT` / `JSESSIONID` when both are set.
+
+Setting it up on a server, from [`session-keeper/`](session-keeper):
+
+```bash
+sudo apt install -y xvfb x11vnc openbox
+mkdir -p ~/li-session && cp session-keeper/* ~/li-session/
+cd ~/li-session && npm install && npx playwright install --with-deps chromium
+```
+
+Log in once, through a virtual display you can see over VNC:
+
+```bash
+# on the server
+x11vnc -storepasswd <password> ~/.vnc/passwd
+DISPLAY=:99 node login.mjs
+
+# from your machine
+ssh -L 5900:localhost:5900 -N ubuntu@<server>
+open vnc://localhost:5900
+```
+
+The browser window appears; log in there. It waits for `li_at`, loads the feed, and writes
+`cookies.json`. That login is bound to the server's own IP, which matters — a session created
+elsewhere and replayed from a datacenter looks like a stolen one.
+
+Then run the keeper as a service:
+
+```bash
+sudo cp session-keeper/li-session.service /etc/systemd/system/
+sudo systemctl enable --now li-session
+journalctl -u li-session -f -o cat
+```
+
+It logs `cookies_refreshed` every five minutes, and `session_lost` if the login lapses and needs
+doing again.
+
+### Run it
 
 ```bash
 pnpm dev
@@ -66,13 +122,13 @@ pnpm dev
 open http://localhost:3000
 ```
 
-Check the cookies work:
+Check the session works:
 
 ```bash
 curl http://localhost:3000/health
 ```
 
-`"alive"` is good. `"expired"` means grab them again.
+`"alive"` is good. `"expired"` means the cookies need replacing, or the keeper needs a re-login.
 
 ## API
 

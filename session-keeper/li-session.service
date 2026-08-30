@@ -1,0 +1,18 @@
+[Unit]
+Description=LinkedIn session keeper (browser + cookie refresh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Environment=DISPLAY=:99
+WorkingDirectory=/home/ubuntu/li-session
+ExecStart=/home/ubuntu/li-session/start-session.sh
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

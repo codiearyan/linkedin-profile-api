@@ -1,0 +1,8 @@
+{
+  "name": "li-session-keeper",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "patchright": "^1.62.2"
+  }
+}

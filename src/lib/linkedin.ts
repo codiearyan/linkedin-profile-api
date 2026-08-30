@@ -32,6 +32,19 @@ function headers(): Record<string, string> {
   };
 }
 
+// a 302 is overloaded and the location header does not tell the cases apart, linkedin answers a
+// dead session by redirecting back to the same url we asked for, which looks identical to a
+// profile we are not allowed to see. so ask whether the session is alive instead of guessing,
+// otherwise you send people off refreshing cookies that were never the problem.
+async function explainRedirect(location: string | null, vanity: string) {
+  if (/\/(uas\/login|checkpoint|authwall)/.test(location ?? "")) {
+    return sessionExpired();
+  }
+  if (!(await probeSession())) return sessionExpired();
+
+  return notFound(vanity);
+}
+
 function sessionExpired() {
   return new ApiError(
     "UPSTREAM_SESSION_EXPIRED",
@@ -65,10 +78,22 @@ export async function fetchRawProfile(vanity: string): Promise<any> {
     decorationId: DECORATION,
   });
 
-  const { status, body } = await request(
+  const { status, body, location } = await request(
     `${LINKEDIN_BASE}/identity/dash/profiles?${params}`,
     headers(),
   );
+
+  if (status === 302) throw await explainRedirect(location, vanity);
+  if (status === 401) throw sessionExpired();
+  if (status === 404) throw notFound(vanity);
+
+  if (status === 429) {
+    throw new ApiError(
+      "UPSTREAM_RATE_LIMITED",
+      503,
+      "LinkedIn is rate limiting this session",
+    );
+  }
 
   if (status !== 200) {
     throw new ApiError("UPSTREAM_ERROR", 502, `LinkedIn returned ${status}`);

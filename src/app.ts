@@ -6,6 +6,7 @@ import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 import { normalizeProfile } from "./lib/normalize.js";
 import { cached, invalidate } from "./lib/cache.js";
 import { checkClientLimit, checkUpstreamLimit } from "./lib/rate-limit.js";
+import { applyFields, parseFields, SECTION_NAMES } from "./lib/fields.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);
@@ -18,7 +19,7 @@ app.get("/", (c) =>
     endpoints: {
       "GET /profile": {
         url: "required — a LinkedIn profile URL or bare vanity name",
-        fields: "optional — comma-separated sections",
+        fields: `optional — comma-separated sections: ${SECTION_NAMES.join(", ")}`,
         refresh: "optional — 'true' bypasses the cache",
       },
       "GET /health": "process health and LinkedIn session state",
@@ -42,6 +43,7 @@ app.get("/profile", async (c) => {
   checkClientLimit(clientIp(c));
 
   const vanity = parseVanity(c.req.query("url") ?? "");
+  const fields = parseFields(c.req.query("fields"));
 
   if (c.req.query("refresh") === "true") invalidate(vanity);
 
@@ -52,7 +54,7 @@ app.get("/profile", async (c) => {
 
   return c.json({
     success: true,
-    data: profile,
+    data: applyFields(profile, fields),
     meta: {
       requestId: c.get("requestId"),
       vanity,

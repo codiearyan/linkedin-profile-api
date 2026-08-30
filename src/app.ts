@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Variables, AppContext } from "./types.js";
 import { requestId, logger } from "./lib/utils.js";
-import { probeSession } from "./lib/linkedin.js";
+import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);
@@ -20,7 +20,7 @@ app.get("/", (c) =>
       "GET /health": "process health and LinkedIn session state",
     },
     example:
-      "/api/profile?url=https://www.linkedin.com/in/aryan&fields=basics,skills",
+      "/profile?url=https://www.linkedin.com/in/aryan&fields=basics,skills",
   }),
 );
 
@@ -31,5 +31,21 @@ app.get("/health", async (c) => {
     status: "ok",
     uptimeSeconds: Math.round(process.uptime()),
     linkedinSession: sessionAlive ? "alive" : "expired",
+  });
+});
+
+app.get("/profile", async (c) => {
+  const vanity = parseVanity(c.req.query("url") ?? "");
+  const profile = await fetchRawProfile(vanity);
+
+  return c.json({
+    success: true,
+    data: profile,
+    meta: {
+      requestId: c.get("requestId"),
+      vanity,
+      fetchedAt: new Date().toISOString(),
+      durationMs: Date.now() - c.get("startedAt"),
+    },
   });
 });

@@ -37,10 +37,11 @@ export async function requestId(
 
 export async function request(
   url: string,
+  headers: Record<string, string>,
 ): Promise<{ status: number; body: string; location: string | null }> {
   try {
     const res = await axios.get<string>(url, {
-      headers: {},
+      headers,
       timeout: TIMEOUT_MS,
       maxRedirects: 0,
       validateStatus: () => true,

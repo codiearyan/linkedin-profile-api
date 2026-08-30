@@ -10,7 +10,7 @@ private API (Voyager), not by scraping HTML and not through any third party serv
 **https://linkedin-api.aryanbhati.com**
 
 ```bash
-curl "https://linkedin-api.aryanbhati.com/profile?url=https://www.linkedin.com/in/aryangajjar"
+curl "https://linkedin-api.aryanbhati.com/?url=https://www.linkedin.com/in/aryangajjar"
 curl "https://linkedin-api.aryanbhati.com/health"
 ```
 
@@ -76,7 +76,9 @@ curl http://localhost:3000/health
 
 ## API
 
-### `GET /profile`
+### `GET /profile`  ·  `GET /`
+
+Both paths are the same handler.
 
 | Param     | Required | Description                          |
 | --------- | -------- | ------------------------------------ |
@@ -128,10 +130,6 @@ cuts the query string short, so URL-encode it or just pass the vanity name.
 ```json
 { "status": "ok", "uptimeSeconds": 128, "linkedinSession": "alive" }
 ```
-
-### `GET /`
-
-Usage docs.
 
 ### Errors
 

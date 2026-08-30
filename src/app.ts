@@ -6,29 +6,13 @@ import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 import { normalizeProfile } from "./lib/normalize.js";
 import { cached, invalidate } from "./lib/cache.js";
 import { checkClientLimit, checkUpstreamLimit } from "./lib/rate-limit.js";
-import { applyFields, parseFields, SECTION_NAMES } from "./lib/fields.js";
+import { applyFields, parseFields } from "./lib/fields.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);
 app.use("*", logger);
 
 //routes
-app.get("/", (c) =>
-  c.json({
-    name: "LinkedIn Profile API",
-    endpoints: {
-      "GET /profile": {
-        url: "required — a LinkedIn profile URL or bare vanity name",
-        fields: `optional — comma-separated sections: ${SECTION_NAMES.join(", ")}`,
-        refresh: "optional — 'true' bypasses the cache",
-      },
-      "GET /health": "process health and LinkedIn session state",
-    },
-    example:
-      "/profile?url=https://www.linkedin.com/in/aryan&fields=basics,skills",
-  }),
-);
-
 app.get("/health", async (c) => {
   const sessionAlive = await probeSession();
 
@@ -39,7 +23,8 @@ app.get("/health", async (c) => {
   });
 });
 
-app.get("/profile", async (c) => {
+// the api only does one thing, so / and /profile are the same handler
+const profile = async (c: AppContext) => {
   checkClientLimit(clientIp(c));
 
   const vanity = parseVanity(c.req.query("url") ?? "");
@@ -63,7 +48,10 @@ app.get("/profile", async (c) => {
       durationMs: Date.now() - c.get("startedAt"),
     },
   });
-});
+};
+
+app.get("/", profile);
+app.get("/profile", profile);
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {

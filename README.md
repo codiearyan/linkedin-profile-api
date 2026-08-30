@@ -76,7 +76,7 @@ curl http://localhost:3000/health
 
 ## API
 
-### `GET /profile`  ·  `GET /`
+### `GET /profile` · `GET /`
 
 Both paths are the same handler.
 
@@ -170,18 +170,24 @@ profile, using a `decorationId` that tells LinkedIn what shape to assemble serve
 The response is a flat entity graph rather than nested JSON, so most of the work is walking
 URN pointers to rebuild it into something usable.
 
-Full write up, including the traps: **[APPROACH.md](APPROACH.md)**
+A **session keeper** handles the fragile part: a real logged-in Chromium runs on the server and
+refreshes the full cookie jar every five minutes, so the API never depends on hand-copied cookies.
+
+Full write up, including the traps and prior-art credit: **[APPROACH.md](APPROACH.md)**
+
+This new approach of using a **session keeper** is built on [mguttmann/linkedin-internal-api](https://github.com/mguttmann/linkedin-internal-api) (MIT).
 
 ## Caution Note
 
 - Image URLs are signed and expire after ~90 days (`expiresAt` is in the response)
 - `decorationId` is pinned to `FullProfileWithEntities-96`. If LinkedIn retires it, requests
   start redirecting and a new one has to be found
-- **Cookies expire and have to be replaced by hand** — `/health` tells you when. This is the main
-  reason the hosted demo can go quiet; there is no refresh token to automate
+- **Sessions are the fragile part.** The session keeper refreshes cookies automatically, but if
+  LinkedIn revokes the session or the login lapses, it needs a manual re-login on the server.
+  `/health` reports which state it is in — this is the usual reason the hosted demo goes quiet
 - LinkedIn revokes a session outright (`set-cookie: li_at=delete me`) if requests don't look like
   its own web client — the `x-li-track` fingerprint header turned out to matter, and omitting it
-  got an account restricted during development. Every request now carries the full header set the service is active
+  got an account restricted during development. Every request now carries the full header set
 - Cache and rate limits are in memory, so they reset on restart
 - This uses a private API and is against LinkedIn's terms of service. Built as a technical
   exercise — use an account you don't mind losing

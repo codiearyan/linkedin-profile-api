@@ -32,3 +32,48 @@ against the LinkedIn rate limit.
 
 **The URL you send is never fetched.** Only the vanity name is taken from it. Otherwise
 `?url=http://169.254.169.254/` would read the server's cloud metadata.
+
+## Keeping the session alive
+
+Copied cookies were a weak point. A browser sends around two dozen cookies and several of them,
+`lidc` in particular, are short lived — so a hand-copied pair is already incomplete when you paste
+it and stale soon after. LinkedIn's response to a request that doesn't look like its own web
+client isn't a 401, it's `set-cookie: li_at=delete me` with a 1970 expiry: the session is revoked
+server side, which logs out the browser that created it too.
+
+So now in this new approach, server runs a **session keeper** rather than holding a static credential:
+
+- A real Chromium, logged in from the server's own IP, kept open under Xvfb with a persistent
+  profile (patchright, so `navigator.webdriver` is false and the UA carries no "Headless")
+- A daemon that reloads `/feed/` every five minutes and writes every LinkedIn cookie to
+  `cookies.json` — the page load is the point, it keeps short-lived cookies current and makes the
+  session look used rather than parked
+- The API reads that file per request via `LI_COOKIE_FILE`, so it always sends a complete jar
+  that is at most five minutes old
+
+The browser never fetches profiles. It exists only to keep a genuine session alive; the profile
+calls are still plain HTTP.
+
+## Prior art
+
+The starting point for the reverse engineering was
+**[mguttmann/linkedin-internal-api](https://github.com/mguttmann/linkedin-internal-api)** (MIT),
+a documented reference for LinkedIn's private API. Credit where it's due — three things came from
+there:
+
+- The `identity/dash/profiles?q=memberIdentity&decorationId=…FullProfileWithEntities-96` endpoint,
+  and the insight that a REST decoration is more stable than the GraphQL route the web client
+  uses, whose `queryId` hash changes on every LinkedIn deploy
+- The header requirements — `JSESSIONID` echoed as `csrf-token`, `x-restli-protocol-version`, and
+  the `application/vnd.linkedin.normalized+json+2.1` accept header that produces the entity graph
+- The browserless-first architecture: a stealth browser as the _session source_ only, with all
+  API calls made over plain HTTP
+
+The widely forked [`linkedin-api`](https://github.com/tomquirk/linkedin-api) was also looked at,
+but it predates LinkedIn's move to the `dash` namespace — it still calls
+`/identity/profiles/{id}/profileView`, which no longer resolves.
+
+Everything else here is original: the TypeScript client, the entity-graph normalizer, the API
+layer with its caching, coalescing, rate limiting and error model, and the diagnosis of the
+revocation behaviour above, which came from reading response headers rather than from any
+existing write-up.

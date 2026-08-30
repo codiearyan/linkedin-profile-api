@@ -3,6 +3,7 @@ import type { Variables, AppContext } from "./types.js";
 import { ApiError } from "./lib/errors.js";
 import { requestId, logger } from "./lib/utils.js";
 import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
+import { normalizeProfile } from "./lib/normalize.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);

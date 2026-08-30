@@ -5,6 +5,7 @@ import { requestId, logger } from "./lib/utils.js";
 import { probeSession, parseVanity, fetchRawProfile } from "./lib/linkedin.js";
 import { normalizeProfile } from "./lib/normalize.js";
 import { cached, invalidate } from "./lib/cache.js";
+import { checkClientLimit, checkUpstreamLimit } from "./lib/rate-limit.js";
 export const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", requestId);
@@ -38,13 +39,16 @@ app.get("/health", async (c) => {
 });
 
 app.get("/profile", async (c) => {
+  checkClientLimit(clientIp(c));
+
   const vanity = parseVanity(c.req.query("url") ?? "");
 
   if (c.req.query("refresh") === "true") invalidate(vanity);
 
-  const { value: profile, hit } = await cached(vanity, async () =>
-    normalizeProfile(await fetchRawProfile(vanity)),
-  );
+  const { value: profile, hit } = await cached(vanity, async () => {
+    checkUpstreamLimit();
+    return normalizeProfile(await fetchRawProfile(vanity));
+  });
 
   return c.json({
     success: true,
@@ -103,3 +107,9 @@ app.notFound((c) =>
     404,
   ),
 );
+
+// behind a proxy the real caller is in x-forwarded-for, the socket address is the proxy itself.
+// locally there is no such header and every request shares one bucket, which is fine.
+function clientIp(c: AppContext): string {
+  return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+}

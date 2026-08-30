@@ -41,7 +41,16 @@ curl "https://linkedin-api.aryanbhati.com/health"
 pnpm install
 ```
 
-The API needs a logged-in LinkedIn session. There are two ways to give it one.
+The API needs a logged-in LinkedIn session. There are two ways to give it one — pick based on
+whether you just want to try it or actually keep it running.
+
+| | **Quick** | **Session keeper** |
+|---|---|---|
+| What you do | Copy two cookies into `.env` | Run a logged-in Chromium on the server |
+| Setup time | A minute | ~20 minutes, one-time |
+| Lasts | Hours at best | Until LinkedIn revokes it or the login lapses |
+| Needs | Nothing extra | A server, Xvfb, one VNC login |
+| Use it for | Trying it locally | Anything deployed |
 
 ### Quick — copy the cookies by hand
 

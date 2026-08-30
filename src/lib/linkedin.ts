@@ -27,8 +27,26 @@ function headers(): Record<string, string> {
     "x-restli-protocol-version": "2.0.0",
     // linkedin reply with the flat { data, included[] } graph
     accept: "application/vnd.linkedin.normalized+json+2.1",
+    "x-li-lang": "en_US",
+    // the tracking blob every real voyager-web request carries. leaving it out is what makes a
+    // request look scripted, and linkedin answers that by revoking the session outright
+    // (set-cookie: li_at=delete me) rather than just refusing the one call.
+    "x-li-track": JSON.stringify({
+      clientVersion: "1.13.45173",
+      mpVersion: "1.13.45173",
+      osName: "web",
+      timezoneOffset: 5.5,
+      timezone: "Asia/Kolkata",
+      deviceFormFactor: "DESKTOP",
+      mpName: "voyager-web",
+      displayDensity: 2,
+      displayWidth: 1512,
+      displayHeight: 982,
+    }),
     "user-agent": USER_AGENT,
     cookie: `li_at=${liAt}; JSESSIONID="${csrf}"`,
+    referer: "https://www.linkedin.com/feed/",
+    origin: "https://www.linkedin.com",
   };
 }
 
